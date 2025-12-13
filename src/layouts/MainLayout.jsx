@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { NavLink, Outlet, useLocation } from 'react-router-dom';
+import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import {
     LayoutDashboard,
     Wallet,
@@ -10,15 +10,26 @@ import {
     ChevronDown,
     ChevronRight,
     Wrench,
-    Bell
+    Bell,
+    Shield,
+    Key,
+    Loader2
 } from 'lucide-react';
 import Logo from '../assets/logo.png';
+import { useAuth } from '../contexts/AuthContext';
 
 const Sidebar = ({ isOpen, toggleSidebar }) => {
     const location = useLocation();
+    const navigate = useNavigate();
+    const { user, logout, isAdmin } = useAuth();
     const [openMenus, setOpenMenus] = useState({ keuangan: true, santri: true });
 
     const toggleMenu = (key) => setOpenMenus(prev => ({ ...prev, [key]: !prev[key] }));
+
+    const handleLogout = async () => {
+        await logout();
+        navigate('/login');
+    };
 
     return (
         <>
@@ -99,16 +110,29 @@ const Sidebar = ({ isOpen, toggleSidebar }) => {
 
                     <div className="pt-4">
                         <p className="px-4 text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-3">Sistem</p>
-                        <NavItem to="/tools" icon={<Wrench size={20} />} label="Tools Bendahara" />
+                        {(isAdmin || user?.role === 'bendahara') && (
+                            <NavItem to="/tools" icon={<Wrench size={20} />} label="Tools Bendahara" />
+                        )}
+                        {isAdmin && (
+                            <NavItem to="/users" icon={<Shield size={20} />} label="Manajemen User" />
+                        )}
                     </div>
                 </nav>
 
-                <div className="p-4 border-t border-slate-800 bg-slate-900/50">
-                    <button className="flex items-center gap-3 w-full px-4 py-3 text-slate-400 hover:text-red-400 hover:bg-red-500/10 rounded-xl transition-all duration-200 text-sm font-medium group">
-                        <LogOut size={20} className="group-hover:-translate-x-1 transition-transform" />
-                        <span>Keluar System</span>
-                    </button>
-                </div>
+                {/* User Info Only */}
+                {user && (
+                    <div className="p-4 border-t border-slate-800 bg-slate-900/50">
+                        <div className="flex items-center gap-3 px-4 py-2 bg-slate-800/50 rounded-xl">
+                            <div className="w-8 h-8 bg-emerald-500 rounded-full flex items-center justify-center text-white font-bold text-sm">
+                                {user.name?.charAt(0).toUpperCase() || 'U'}
+                            </div>
+                            <div className="flex-1 min-w-0">
+                                <p className="text-sm font-medium text-white truncate">{user.name}</p>
+                                <p className="text-[10px] text-slate-400 uppercase">{user.role}</p>
+                            </div>
+                        </div>
+                    </div>
+                )}
             </div>
         </>
     );
@@ -151,6 +175,66 @@ const SubNavItem = ({ to, label }) => (
 
 export default function MainLayout() {
     const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+    const [showProfileMenu, setShowProfileMenu] = useState(false);
+    const [showPasswordModal, setShowPasswordModal] = useState(false);
+    const [passwordForm, setPasswordForm] = useState({ current: '', new: '', confirm: '' });
+    const [saving, setSaving] = useState(false);
+    const { user, logout } = useAuth();
+    const navigate = useNavigate();
+
+    const handleLogout = async () => {
+        await logout();
+        navigate('/login');
+    };
+
+    const handlePasswordChange = async (e) => {
+        e.preventDefault();
+        if (passwordForm.new !== passwordForm.confirm) {
+            alert('Password baru tidak cocok!');
+            return;
+        }
+        if (passwordForm.new.length < 4) {
+            alert('Password minimal 4 karakter!');
+            return;
+        }
+        setSaving(true);
+        try {
+            const { supabase } = await import('../lib/supabase');
+
+            // Verify current password
+            const { data: currentUser } = await supabase
+                .from('users')
+                .select('password')
+                .eq('id', user.id)
+                .single();
+
+            if (currentUser?.password !== passwordForm.current) {
+                alert('Password lama salah!');
+                setSaving(false);
+                return;
+            }
+
+            // Update password
+            await supabase.from('users').update({ password: passwordForm.new }).eq('id', user.id);
+
+            // Log activity
+            await supabase.from('audit_logs').insert([{
+                id: Date.now().toString(36),
+                action: 'GANTI_PASSWORD',
+                details: `${user.name} mengubah password sendiri`,
+                user_name: user.name,
+                timestamp: new Date().toISOString()
+            }]);
+
+            alert('Password berhasil diubah!');
+            setShowPasswordModal(false);
+            setPasswordForm({ current: '', new: '', confirm: '' });
+        } catch (err) {
+            alert('Error: ' + err.message);
+        } finally {
+            setSaving(false);
+        }
+    };
 
     return (
         <div className="flex h-screen bg-slate-50/50 font-sans overflow-hidden selection:bg-emerald-500/30 selection:text-emerald-900">
@@ -167,7 +251,7 @@ export default function MainLayout() {
                             <p className="text-xs text-slate-500 lg:hidden mt-1">Mobile Dashboard</p>
 
                             <div className="hidden lg:block">
-                                <h2 className="text-lg font-bold text-slate-800">Selamat Datang, Admin!</h2>
+                                <h2 className="text-lg font-bold text-slate-800">Selamat Datang, {user?.name || 'User'}!</h2>
                                 <p className="text-xs text-slate-500 mt-0.5">Kelola keuangan pesantren dengan mudah.</p>
                             </div>
                         </div>
@@ -181,17 +265,48 @@ export default function MainLayout() {
 
                         <div className="h-8 w-[1px] bg-slate-200 hidden sm:block"></div>
 
-                        <div className="flex items-center gap-3 pl-2">
-                            <div className="text-right hidden sm:block">
-                                <p className="text-sm font-bold text-slate-700">Bendahara</p>
-                                <div className="flex items-center justify-end gap-1.5">
-                                    <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse"></span>
-                                    <p className="text-[10px] text-emerald-600 font-medium">Online</p>
+                        {/* Profile Dropdown */}
+                        <div className="relative">
+                            <button
+                                onClick={() => setShowProfileMenu(!showProfileMenu)}
+                                className="flex items-center gap-3 pl-2 hover:opacity-80 transition-opacity"
+                            >
+                                <div className="text-right hidden sm:block">
+                                    <p className="text-sm font-bold text-slate-700">{user?.name || 'User'}</p>
+                                    <div className="flex items-center justify-end gap-1.5">
+                                        <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse"></span>
+                                        <p className="text-[10px] text-emerald-600 font-medium uppercase">{user?.role || 'User'}</p>
+                                    </div>
                                 </div>
-                            </div>
-                            <div className="w-10 h-10 bg-gradient-to-br from-emerald-500 to-teal-600 rounded-full flex items-center justify-center text-white font-bold border-[3px] border-white shadow-md shadow-emerald-200 hover:scale-105 transition-transform cursor-pointer">
-                                A
-                            </div>
+                                <div className="w-10 h-10 bg-gradient-to-br from-emerald-500 to-teal-600 rounded-full flex items-center justify-center text-white font-bold border-[3px] border-white shadow-md shadow-emerald-200 hover:scale-105 transition-transform cursor-pointer">
+                                    {user?.name?.charAt(0).toUpperCase() || 'U'}
+                                </div>
+                            </button>
+
+                            {/* Dropdown Menu */}
+                            {showProfileMenu && (
+                                <>
+                                    <div className="fixed inset-0 z-40" onClick={() => setShowProfileMenu(false)}></div>
+                                    <div className="absolute right-0 top-14 w-56 bg-white rounded-2xl shadow-xl border border-slate-100 py-2 z-50 overflow-hidden">
+                                        <div className="px-4 py-3 border-b border-slate-100">
+                                            <p className="font-bold text-slate-800">{user?.name}</p>
+                                            <p className="text-xs text-slate-500">@{user?.username}</p>
+                                        </div>
+                                        <button
+                                            onClick={() => { setShowProfileMenu(false); setShowPasswordModal(true); }}
+                                            className="w-full px-4 py-3 flex items-center gap-3 text-slate-600 hover:bg-slate-50 transition-colors text-sm"
+                                        >
+                                            <Key size={16} /> Ubah Password
+                                        </button>
+                                        <button
+                                            onClick={handleLogout}
+                                            className="w-full px-4 py-3 flex items-center gap-3 text-red-500 hover:bg-red-50 transition-colors text-sm border-t border-slate-100"
+                                        >
+                                            <LogOut size={16} /> Keluar Sistem
+                                        </button>
+                                    </div>
+                                </>
+                            )}
                         </div>
                     </div>
                 </header>
@@ -205,6 +320,63 @@ export default function MainLayout() {
                     </footer>
                 </main>
             </div>
+
+            {/* Password Change Modal */}
+            {showPasswordModal && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4">
+                    <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden">
+                        <div className="p-5 border-b flex justify-between items-center bg-slate-50">
+                            <h3 className="font-bold text-lg text-slate-800">Ubah Password</h3>
+                            <button onClick={() => setShowPasswordModal(false)} className="p-2 hover:bg-red-50 hover:text-red-500 rounded-full">
+                                <X size={20} />
+                            </button>
+                        </div>
+                        <form onSubmit={handlePasswordChange} className="p-5 space-y-4">
+                            <div>
+                                <label className="block text-sm font-bold text-slate-700 mb-1">Password Lama</label>
+                                <input
+                                    type="password"
+                                    required
+                                    className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                                    placeholder="Masukkan password lama"
+                                    value={passwordForm.current}
+                                    onChange={(e) => setPasswordForm({ ...passwordForm, current: e.target.value })}
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-sm font-bold text-slate-700 mb-1">Password Baru</label>
+                                <input
+                                    type="password"
+                                    required
+                                    className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                                    placeholder="Masukkan password baru"
+                                    value={passwordForm.new}
+                                    onChange={(e) => setPasswordForm({ ...passwordForm, new: e.target.value })}
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-sm font-bold text-slate-700 mb-1">Konfirmasi Password Baru</label>
+                                <input
+                                    type="password"
+                                    required
+                                    className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                                    placeholder="Ulangi password baru"
+                                    value={passwordForm.confirm}
+                                    onChange={(e) => setPasswordForm({ ...passwordForm, confirm: e.target.value })}
+                                />
+                            </div>
+                            <button
+                                type="submit"
+                                disabled={saving}
+                                className="w-full py-3 bg-emerald-500 hover:bg-emerald-600 text-white rounded-xl font-bold flex items-center justify-center gap-2 disabled:opacity-50"
+                            >
+                                {saving ? <><Loader2 size={16} className="animate-spin" /> Menyimpan...</> : 'Ubah Password'}
+                            </button>
+                        </form>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }
+

@@ -10,9 +10,11 @@ import { supabase } from '../lib/supabase';
 import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import Logo from '../assets/logo.png';
+import { useAuth } from '../contexts/AuthContext';
 
 export default function Keuangan() {
     const { tab } = useParams();
+    const { canEdit } = useAuth();
 
     // Supabase hooks
     const { data: transactions, loading: txLoading, insert: insertTx, update: updateTx, remove: removeTx } = useSupabase('transactions', []);
@@ -256,7 +258,7 @@ export default function Keuangan() {
                 </div>
                 <div className="flex gap-2">
                     <button onClick={exportPDF} className="btn-secondary text-xs"><Download size={14} /> Download Data</button>
-                    <button onClick={openAddModal} className="btn-primary text-xs"><Plus size={14} /> Transaksi Baru</button>
+                    {canEdit && <button onClick={openAddModal} className="btn-primary text-xs"><Plus size={14} /> Transaksi Baru</button>}
                 </div>
             </div>
 
@@ -338,8 +340,12 @@ export default function Keuangan() {
                                 {t.type === 'pemasukan' ? '+' : '-'}{formatCurrency(t.amount)}
                             </span>
                             <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                                <button onClick={() => openEditModal(t)} className="p-2 text-blue-500 hover:bg-blue-50 rounded-lg transition-colors" title="Edit"><Edit size={16} /></button>
-                                <button onClick={() => handleDelete(t.id)} className="p-2 text-red-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors" title="Hapus"><Trash2 size={16} /></button>
+                                {canEdit && (
+                                    <>
+                                        <button onClick={() => openEditModal(t)} className="p-2 text-blue-500 hover:bg-blue-50 rounded-lg transition-colors" title="Edit"><Edit size={16} /></button>
+                                        <button onClick={() => handleDelete(t.id)} className="p-2 text-red-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors" title="Hapus"><Trash2 size={16} /></button>
+                                    </>
+                                )}
                             </div>
                         </div>
                     </div>

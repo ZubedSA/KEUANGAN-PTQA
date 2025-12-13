@@ -11,9 +11,11 @@ import { supabase } from '../lib/supabase';
 import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import Logo from '../assets/logo.png';
+import { useAuth } from '../contexts/AuthContext';
 
 export default function Santri() {
     const { tab } = useParams();
+    const { canEdit } = useAuth();
     const activeTab = useMemo(() =>
         ['data', 'tagihan', 'kategori', 'pembayaran', 'laporan'].includes(tab) ? tab : 'data',
         [tab]);
@@ -548,11 +550,11 @@ export default function Santri() {
                         )}
                     </div>
                     <div className="flex gap-3 w-full md:w-auto">
-                        {activeTab === 'data' && <button onClick={() => { setStudentForm({ id: '', nis: '', name: '', kelas: '', angkatan: '', parent_name: '', phone: '', status: 'Aktif' }); setModalType('student'); setIsModalOpen(true); }} className="btn-primary w-full md:w-auto"><Plus size={16} /> Tambah</button>}
-                        {activeTab === 'kategori' && <button onClick={() => { setCategoryForm({ id: '', name: '', amount: '', type: 'pembayaran' }); setModalType('category'); setIsModalOpen(true); }} className="btn-primary w-full md:w-auto"><Plus size={16} /> Tambah</button>}
+                        {activeTab === 'data' && canEdit && <button onClick={() => { setStudentForm({ id: '', nis: '', name: '', kelas: '', angkatan: '', parent_name: '', phone: '', status: 'Aktif' }); setModalType('student'); setIsModalOpen(true); }} className="btn-primary w-full md:w-auto"><Plus size={16} /> Tambah</button>}
+                        {activeTab === 'kategori' && canEdit && <button onClick={() => { setCategoryForm({ id: '', name: '', amount: '', type: 'pembayaran' }); setModalType('category'); setIsModalOpen(true); }} className="btn-primary w-full md:w-auto"><Plus size={16} /> Tambah</button>}
                         {activeTab === 'tagihan' && (
                             <>
-                                <button onClick={() => { setBillForm({ month: new Date().toISOString().slice(0, 7), categoryId: '', amount: '', targets: [] }); setModalType('bill'); setIsModalOpen(true); }} className="btn-primary bg-indigo-600 hover:bg-indigo-700 w-full md:w-auto"><Plus size={16} /> Buat Tagihan</button>
+                                {canEdit && <button onClick={() => { setBillForm({ month: new Date().toISOString().slice(0, 7), categoryId: '', amount: '', targets: [] }); setModalType('bill'); setIsModalOpen(true); }} className="btn-primary bg-indigo-600 hover:bg-indigo-700 w-full md:w-auto"><Plus size={16} /> Buat Tagihan</button>}
                                 <button onClick={exportBillsPDF} className="btn-secondary w-full md:w-auto"><Download size={16} /> Download Data</button>
                             </>
                         )}
