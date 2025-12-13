@@ -13,7 +13,8 @@ import {
     Bell,
     Shield,
     Key,
-    Loader2
+    Loader2,
+    Banknote
 } from 'lucide-react';
 import Logo from '../assets/logo.png';
 import { useAuth } from '../contexts/AuthContext';
@@ -21,8 +22,8 @@ import { useAuth } from '../contexts/AuthContext';
 const Sidebar = ({ isOpen, toggleSidebar }) => {
     const location = useLocation();
     const navigate = useNavigate();
-    const { user, logout, isAdmin } = useAuth();
-    const [openMenus, setOpenMenus] = useState({ keuangan: true, santri: true });
+    const { user, logout, isAdmin, isBendahara, isPengasuh } = useAuth();
+    const [openMenus, setOpenMenus] = useState({ keuangan: true, santri: true, penyaluran: false });
 
     const toggleMenu = (key) => setOpenMenus(prev => ({ ...prev, [key]: !prev[key] }));
 
@@ -108,9 +109,40 @@ const Sidebar = ({ isOpen, toggleSidebar }) => {
                         </div>
                     </div>
 
+                    {/* Penyaluran Dana Group - Visible for all roles */}
+                    <div className="mb-2">
+                        <button onClick={() => toggleMenu('penyaluran')} className="w-full flex items-center justify-between px-4 py-3 text-slate-300 hover:bg-slate-800/50 hover:text-white rounded-xl transition-all duration-200 group">
+                            <div className="flex items-center gap-3">
+                                <div className={`p-1.5 rounded-lg transition-colors ${openMenus.penyaluran ? 'bg-amber-500/10 text-amber-400' : 'bg-slate-800 group-hover:bg-slate-700'}`}>
+                                    <Banknote size={18} />
+                                </div>
+                                <span className="text-sm font-medium">Penyaluran Dana</span>
+                            </div>
+                            {openMenus.penyaluran ? <ChevronDown size={14} className="text-amber-500" /> : <ChevronRight size={14} className="text-slate-500" />}
+                        </button>
+                        <div className={`overflow-hidden transition-all duration-300 ease-in-out ${openMenus.penyaluran ? 'max-h-48 opacity-100 mt-1' : 'max-h-0 opacity-0'}`}>
+                            <div className="ml-4 pl-4 border-l border-slate-700/50 space-y-1 py-1">
+                                {/* Anggaran - Admin & Bendahara only */}
+                                {(isAdmin || isBendahara) && (
+                                    <SubNavItem to="/penyaluran/anggaran" label="Anggaran Penyaluran" />
+                                )}
+                                {/* Persetujuan - Admin & Pengasuh only */}
+                                {(isAdmin || isPengasuh) && (
+                                    <SubNavItem to="/penyaluran/persetujuan" label="Persetujuan" />
+                                )}
+                                {/* Realisasi - Admin & Bendahara only */}
+                                {(isAdmin || isBendahara) && (
+                                    <SubNavItem to="/penyaluran/realisasi" label="Realisasi Dana" />
+                                )}
+                                {/* Laporan - All roles */}
+                                <SubNavItem to="/penyaluran/laporan" label="Laporan Penyaluran" />
+                            </div>
+                        </div>
+                    </div>
+
                     <div className="pt-4">
                         <p className="px-4 text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-3">Sistem</p>
-                        {(isAdmin || user?.role === 'bendahara') && (
+                        {(isAdmin || isBendahara) && (
                             <NavItem to="/tools" icon={<Wrench size={20} />} label="Tools Bendahara" />
                         )}
                         {isAdmin && (

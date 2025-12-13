@@ -56,7 +56,7 @@ export default function Login() {
                 <div className="bg-white rounded-3xl shadow-2xl overflow-hidden">
                     <div className="p-8">
                         <div className="text-center mb-8">
-                            <h2 className="text-2xl font-bold text-slate-800">Selamat Datang</h2>
+                            <h2 className="text-2xl font-bold text-slate-800">Assalamualaikum</h2>
                             <p className="text-slate-500 text-sm mt-1">Masuk ke akun Anda</p>
                         </div>
 

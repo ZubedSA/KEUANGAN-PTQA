@@ -587,8 +587,12 @@ export default function Santri() {
                             <td className="table-cell"><span className={`badge ${s.status === 'Aktif' ? 'badge-success' : 'badge-warning'}`}>{s.status}</span></td>
                             <td className="table-cell text-center">
                                 <div className="flex justify-center gap-2 opacity-60 group-hover:opacity-100">
-                                    <button onClick={() => { setStudentForm(s); setModalType('student'); setIsModalOpen(true); }} className="text-blue-600 p-2 hover:bg-blue-50 rounded-lg"><Edit size={16} /></button>
-                                    <button onClick={async () => { if (confirm("Hapus?")) { await removeStudent(s.id); await logActivity('HAPUS_SANTRI', s.name); } }} className="text-red-600 p-2 hover:bg-red-50 rounded-lg"><Trash2 size={16} /></button>
+                                    {canEdit && (
+                                        <>
+                                            <button onClick={() => { setStudentForm(s); setModalType('student'); setIsModalOpen(true); }} className="text-blue-600 p-2 hover:bg-blue-50 rounded-lg"><Edit size={16} /></button>
+                                            <button onClick={async () => { if (confirm("Hapus?")) { await removeStudent(s.id); await logActivity('HAPUS_SANTRI', s.name); } }} className="text-red-600 p-2 hover:bg-red-50 rounded-lg"><Trash2 size={16} /></button>
+                                        </>
+                                    )}
                                 </div>
                             </td>
                         </tr>
@@ -609,8 +613,12 @@ export default function Santri() {
                             <td className="table-cell font-mono text-slate-600">{Number(c.amount) > 0 ? formatCurrency(c.amount) : <span className="text-slate-400 italic">Fleksibel</span>}</td>
                             <td className="table-cell text-center">
                                 <div className="flex justify-center gap-2 opacity-60 group-hover:opacity-100">
-                                    <button onClick={() => { setCategoryForm(c); setModalType('category'); setIsModalOpen(true); }} className="text-blue-600 p-2 hover:bg-blue-50 rounded-lg"><Edit size={16} /></button>
-                                    <button onClick={async () => { if (confirm("Hapus?")) await removeCategory(c.id); }} className="text-red-600 p-2 hover:bg-red-50 rounded-lg"><Trash2 size={16} /></button>
+                                    {canEdit && (
+                                        <>
+                                            <button onClick={() => { setCategoryForm(c); setModalType('category'); setIsModalOpen(true); }} className="text-blue-600 p-2 hover:bg-blue-50 rounded-lg"><Edit size={16} /></button>
+                                            <button onClick={async () => { if (confirm("Hapus?")) await removeCategory(c.id); }} className="text-red-600 p-2 hover:bg-red-50 rounded-lg"><Trash2 size={16} /></button>
+                                        </>
+                                    )}
                                 </div>
                             </td>
                         </tr>
@@ -629,8 +637,12 @@ export default function Santri() {
                             <td className="table-cell"><span className={`badge ${b.status === 'Lunas' ? 'badge-success' : 'badge-danger'}`}>{b.status}</span></td>
                             <td className="table-cell text-center">
                                 <div className="flex justify-center gap-2 opacity-60 group-hover:opacity-100">
-                                    <button onClick={() => { setEditBillData(b); setModalType('editBill'); setIsModalOpen(true); }} className="text-blue-600 p-2 hover:bg-blue-50 rounded-lg"><Edit size={16} /></button>
-                                    <button onClick={async () => { if (confirm("Hapus?")) await removeBill(b.id); }} className="text-red-600 p-2 hover:bg-red-50 rounded-lg"><Trash2 size={16} /></button>
+                                    {canEdit && (
+                                        <>
+                                            <button onClick={() => { setEditBillData(b); setModalType('editBill'); setIsModalOpen(true); }} className="text-blue-600 p-2 hover:bg-blue-50 rounded-lg"><Edit size={16} /></button>
+                                            <button onClick={async () => { if (confirm("Hapus?")) await removeBill(b.id); }} className="text-red-600 p-2 hover:bg-red-50 rounded-lg"><Trash2 size={16} /></button>
+                                        </>
+                                    )}
                                 </div>
                             </td>
                         </tr>
@@ -683,7 +695,9 @@ export default function Santri() {
                                                     <div className="text-xs text-slate-500 font-mono">{formatCurrency(b.amount)}</div>
                                                 </div>
                                             </div>
-                                            <button onClick={() => handlePayBill(b)} disabled={saving} className="px-6 py-2 bg-slate-900 text-white rounded-lg text-sm font-bold hover:bg-emerald-600 disabled:opacity-50">Bayar</button>
+                                            {canEdit && (
+                                                <button onClick={() => handlePayBill(b)} disabled={saving} className="px-6 py-2 bg-slate-900 text-white rounded-lg text-sm font-bold hover:bg-emerald-600 disabled:opacity-50">Bayar</button>
+                                            )}
                                         </div>
                                     )) : <div className="text-center py-8 text-slate-400 italic bg-slate-50 rounded-xl">Tidak ada tunggakan</div>}
                                 </div>

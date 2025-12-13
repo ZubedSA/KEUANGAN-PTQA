@@ -7,6 +7,7 @@ import Santri from './pages/Santri';
 import Tools from './pages/Tools';
 import Login from './pages/Login';
 import UserManagement from './pages/UserManagement';
+import Penyaluran from './pages/Penyaluran';
 
 // Protected Route Component
 function ProtectedRoute({ children }) {
@@ -64,6 +65,10 @@ function AppRoutes() {
         {/* Santri Route with Submenu Logic */}
         <Route path="santri" element={<Navigate to="/santri/data" replace />} />
         <Route path="santri/:tab" element={<Santri />} />
+
+        {/* Penyaluran Dana Route */}
+        <Route path="penyaluran" element={<Navigate to="/penyaluran/anggaran" replace />} />
+        <Route path="penyaluran/:tab" element={<Penyaluran />} />
 
         <Route path="tools" element={<Tools />} />
 

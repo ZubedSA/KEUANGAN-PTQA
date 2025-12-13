@@ -72,6 +72,12 @@ export default function useSupabase(tableName, initialValue = []) {
                 .single();
 
             if (insertError) throw insertError;
+
+            // Update local state immediately
+            if (inserted) {
+                setData(prev => [inserted, ...prev]);
+            }
+
             return inserted;
         } catch (err) {
             console.error(`Error inserting into ${tableName}:`, err);
@@ -91,6 +97,12 @@ export default function useSupabase(tableName, initialValue = []) {
                 .single();
 
             if (updateError) throw updateError;
+
+            // Update local state immediately
+            if (updated) {
+                setData(prev => prev.map(item => item.id === updated.id ? updated : item));
+            }
+
             return updated;
         } catch (err) {
             console.error(`Error updating ${tableName}:`, err);
@@ -108,6 +120,10 @@ export default function useSupabase(tableName, initialValue = []) {
                 .eq('id', id);
 
             if (deleteError) throw deleteError;
+
+            // Update local state immediately
+            setData(prev => prev.filter(item => item.id !== id));
+
             return true;
         } catch (err) {
             console.error(`Error deleting from ${tableName}:`, err);
