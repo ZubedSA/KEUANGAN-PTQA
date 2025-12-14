@@ -78,7 +78,13 @@ function AppRoutes() {
             <UserManagement />
           </AdminRoute>
         } />
+
+        {/* Catch-all route for unmatched paths */}
+        <Route path="*" element={<Navigate to="/" replace />} />
       </Route>
+
+      {/* Global catch-all for any unmatched paths */}
+      <Route path="*" element={<Navigate to="/login" replace />} />
     </Routes>
   );
 }
