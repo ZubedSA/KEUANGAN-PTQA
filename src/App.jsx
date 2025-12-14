@@ -1,5 +1,6 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
+import { NotificationProvider } from './contexts/NotificationContext';
 import MainLayout from './layouts/MainLayout';
 import Dashboard from './pages/Dashboard';
 import Keuangan from './pages/Keuangan';
@@ -8,6 +9,7 @@ import Tools from './pages/Tools';
 import Login from './pages/Login';
 import UserManagement from './pages/UserManagement';
 import Penyaluran from './pages/Penyaluran';
+import Notifikasi from './pages/Notifikasi';
 
 // Protected Route Component
 function ProtectedRoute({ children }) {
@@ -79,6 +81,9 @@ function AppRoutes() {
           </AdminRoute>
         } />
 
+        {/* Notification History */}
+        <Route path="notifikasi" element={<Notifikasi />} />
+
         {/* Catch-all route for unmatched paths */}
         <Route path="*" element={<Navigate to="/" replace />} />
       </Route>
@@ -93,7 +98,9 @@ function App() {
   return (
     <BrowserRouter>
       <AuthProvider>
-        <AppRoutes />
+        <NotificationProvider>
+          <AppRoutes />
+        </NotificationProvider>
       </AuthProvider>
     </BrowserRouter>
   );

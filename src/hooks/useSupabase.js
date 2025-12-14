@@ -38,13 +38,21 @@ export default function useSupabase(tableName, initialValue = []) {
         fetchData();
     }, [fetchData]);
 
-    // Realtime subscription
+    // NOTE: Realtime subscription removed to prevent duplicate data issue
+    // Local state updates in insert/update/remove functions are sufficient
+    // If you need multi-user sync, you can uncomment the realtime code below
+    // and ensure your Supabase tables have realtime enabled
+    /*
     useEffect(() => {
         const channel = supabase
             .channel(`${tableName}_changes`)
             .on('postgres_changes', { event: '*', schema: 'public', table: tableName }, (payload) => {
                 if (payload.eventType === 'INSERT') {
-                    setData(prev => [payload.new, ...prev]);
+                    setData(prev => {
+                        const exists = prev.some(item => item.id === payload.new.id);
+                        if (exists) return prev;
+                        return [payload.new, ...prev];
+                    });
                 } else if (payload.eventType === 'UPDATE') {
                     setData(prev => prev.map(item => item.id === payload.new.id ? payload.new : item));
                 } else if (payload.eventType === 'DELETE') {
@@ -57,6 +65,7 @@ export default function useSupabase(tableName, initialValue = []) {
             supabase.removeChannel(channel);
         };
     }, [tableName]);
+    */
 
     // Insert function
     const insert = async (newRecord) => {

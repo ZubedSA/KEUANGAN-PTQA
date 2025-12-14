@@ -80,6 +80,65 @@ export default function Santri() {
         window.open(`https://wa.me/${number}?text=${encodeURIComponent(message)}`, '_blank');
     };
 
+    // Get month name in Indonesian
+    const getMonthName = (monthStr, includeYear = false) => {
+        const months = ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
+        if (!monthStr) return '';
+        const parts = monthStr.split('-');
+        if (parts.length >= 2) {
+            const monthIndex = parseInt(parts[1]) - 1;
+            if (includeYear) {
+                return months[monthIndex] + ' ' + parts[0];
+            }
+            return months[monthIndex];
+        }
+        return monthStr;
+    };
+
+    // WhatsApp message for unpaid bills (reminder)
+    const sendWAReminder = (student, bill) => {
+        const message = `Assalamu'alaikum Wr. Wb.
+
+Yth. Wali Santri ${student.name}
+
+Kami sampaikan pengingat pembayaran:
+
+TAGIHAN PEMBAYARAN
+* Nama Santri: ${student.name}
+* Jenis: ${bill.category_name}
+* Periode: ${getMonthName(bill.month)}
+* Jumlah: ${formatCurrency(bill.amount)}
+* Status: BELUM LUNAS
+
+Mohon segera melakukan pembayaran. Jazakumullah khairan.
+
+Pondok Pesantren Tahfizh Qur'an Al-Usymuni`;
+        sendWA(student.phone, message);
+    };
+
+    // WhatsApp message for paid bills (receipt)
+    const sendWAReceipt = (student, bill) => {
+        const today = new Date();
+        const dateStr = today.toLocaleDateString('id-ID', { day: '2-digit', month: 'long', year: 'numeric' });
+        const message = `Assalamu'alaikum Wr. Wb.
+
+Yth. Bapak/Ibu ${student.parent_name || student.name}
+
+Terima kasih atas pembayaran ${bill.category_name} santri ${student.name}.
+
+BUKTI PEMBAYARAN
+* Jenis: ${bill.category_name}
+* Periode: ${getMonthName(bill.month, true)}
+* Jumlah: ${formatCurrency(bill.amount)}
+* Status: LUNAS
+* Tanggal: ${dateStr}
+
+Barakallahu fiikum.
+
+Pondok Tahfizh Qur'an Al-Usymuni`;
+        sendWA(student.phone, message);
+    };
+
     // Computed Data
     const filteredBills = useMemo(() => {
         return bills.filter(b => {
@@ -108,6 +167,9 @@ export default function Santri() {
         const pw = doc.internal.pageSize.getWidth();
         const ph = doc.internal.pageSize.getHeight();
 
+        // Get student data for NIS
+        const student = students.find(s => s.id === tx.student_id) || {};
+
         doc.setDrawColor(16, 185, 129); doc.setLineWidth(1);
         doc.rect(5, 5, pw - 10, ph - 10);
         doc.setLineWidth(0.3); doc.rect(7, 7, pw - 14, ph - 14);
@@ -129,19 +191,40 @@ export default function Santri() {
         doc.text(`No. ${(tx.id || '').substring(0, 10).toUpperCase()}`, pw / 2, 54, { align: 'center' });
 
         doc.setTextColor(30, 41, 59); doc.setFontSize(10);
-        let y = 68;
-        doc.text("Tanggal", 15, y); doc.text(`: ${formatDate(tx.date)}`, 55, y); y += 8;
-        doc.text("Nama Santri", 15, y); doc.setFont("helvetica", "bold"); doc.text(`: ${tx.student_name}`, 55, y); y += 8;
-        doc.setFont("helvetica", "normal"); doc.text("Jenis Pembayaran", 15, y); doc.text(`: ${tx.category}`, 55, y); y += 12;
+        let y = 64;
+        doc.text("Tanggal", 15, y); doc.text(`: ${formatDate(tx.date)}`, 55, y); y += 7;
+        doc.text("Nama Santri", 15, y); doc.setFont("helvetica", "bold"); doc.text(`: ${tx.student_name}`, 55, y); y += 7;
+        doc.setFont("helvetica", "normal");
+        doc.text("NIS", 15, y); doc.text(`: ${tx.student_nis || student.nis || '-'}`, 55, y); y += 7;
+        doc.text("Jenis Pembayaran", 15, y); doc.text(`: ${tx.category}`, 55, y); y += 7;
+        // Format periode properly
+        const periodeText = tx.month ? getMonthName(tx.month, true) : (tx.period ? getMonthName(tx.period, true) : '-');
+        doc.text("Periode", 15, y); doc.text(`: ${periodeText}`, 55, y); y += 7;
+        doc.text("Status", 15, y); doc.setFont("helvetica", "bold"); doc.setTextColor(16, 185, 129); doc.text(`: LUNAS`, 55, y); y += 10;
 
         doc.setFillColor(240, 253, 244); doc.setDrawColor(16, 185, 129); doc.setLineWidth(0.5);
         doc.roundedRect(12, y, pw - 24, 18, 3, 3, 'FD');
         doc.setFontSize(10); doc.setFont("helvetica", "bold"); doc.setTextColor(16, 185, 129);
-        doc.text("JUMLAH DIBAYAR", 18, y + 7);
+        doc.text("JUMLAH TERBAYAR", 18, y + 7);
         doc.setFontSize(14); doc.text(formatCurrency(tx.amount), pw - 18, y + 13, { align: 'right' });
+        y += 25;
 
-        doc.setFontSize(8); doc.setTextColor(148, 163, 184); doc.setFont("helvetica", "normal");
-        doc.text("Kwitansi ini sah sebagai bukti pembayaran.", pw / 2, ph - 25, { align: 'center' });
+        // Barakallahu fiikum
+        doc.setFontSize(10); doc.setFont("helvetica", "italic"); doc.setTextColor(100, 116, 139);
+        doc.text("Barakallahu fiikum", pw / 2, y, { align: 'center' });
+        y += 20;
+
+        // Bendahara signature - CENTERED
+        doc.setFontSize(9); doc.setFont("helvetica", "normal"); doc.setTextColor(30, 41, 59);
+        doc.text("BENDAHARA PONDOK", pw / 2, y, { align: 'center' });
+        y += 15;
+        doc.setFont("helvetica", "bold");
+        doc.text("UST. MIFTAHUL JANNAH", pw / 2, y, { align: 'center' });
+
+        // Footer note
+        doc.setFontSize(7); doc.setTextColor(148, 163, 184); doc.setFont("helvetica", "normal");
+        doc.text("Kwitansi ini sah sebagai bukti pembayaran.", pw / 2, ph - 12, { align: 'center' });
+
         doc.save(`Kwitansi_${(tx.student_name || 'Santri').replace(/\s/g, '_')}.pdf`);
     };
 
@@ -360,7 +443,13 @@ export default function Santri() {
             await updateBill(bill.id, { status: 'Lunas' });
             await insertTransaction(tx);
             await logActivity('PEMBAYARAN', `${activeStudent.name} - ${bill.category_name}`);
-            setLastPayment({ ...tx, student_phone: activeStudent.phone });
+            setLastPayment({
+                ...tx,
+                student_phone: activeStudent.phone,
+                student_nis: activeStudent.nis,
+                period: bill.month,
+                month: bill.month
+            });
             setModalType('receipt');
             setIsModalOpen(true);
         } catch (err) { alert('Error: ' + err.message); }
@@ -473,7 +562,29 @@ export default function Santri() {
                                     <h3 className="text-xl font-bold text-slate-800">Pembayaran Berhasil!</h3>
                                     <div className="flex gap-4">
                                         <button onClick={() => generateReceiptPDF(lastPayment)} className="btn-secondary flex-1"><Printer size={18} /> Cetak</button>
-                                        <button onClick={() => sendWA(lastPayment.student_phone, `Pembayaran ${lastPayment.category} sebesar ${formatCurrency(lastPayment.amount)} telah LUNAS. Terima kasih.`)} className="btn-primary flex-1"><MessageCircle size={18} /> Kirim WA</button>
+                                        <button onClick={() => {
+                                            const today = new Date();
+                                            const dateStr = today.toLocaleDateString('id-ID', { day: '2-digit', month: 'long', year: 'numeric' });
+                                            const student = students.find(s => s.id === lastPayment.student_id) || {};
+                                            const message = `Assalamu'alaikum Wr. Wb.
+
+Yth. Bapak/Ibu ${student.parent_name || student.name || lastPayment.student_name}
+
+Terima kasih atas pembayaran ${lastPayment.category} santri ${lastPayment.student_name}.
+
+BUKTI PEMBAYARAN
+* Nama Santri: ${lastPayment.student_name}
+* NIS: ${student.nis || '-'}
+* Jenis: ${lastPayment.category}
+* Jumlah: ${formatCurrency(lastPayment.amount)}
+* Status: LUNAS
+* Tanggal: ${dateStr}
+
+Barakallahu fiikum.
+
+Pondok Pesantren Tahfizh Qur'an Al-Usymuni`;
+                                            sendWA(lastPayment.student_phone, message);
+                                        }} className="btn-primary flex-1"><MessageCircle size={18} /> Kirim WA</button>
                                     </div>
                                 </div>
                             )}
@@ -669,7 +780,27 @@ export default function Santri() {
                                     <button onClick={() => {
                                         if (unpaidBills.length === 0) return alert("Tidak ada tagihan");
                                         const total = unpaidBills.reduce((a, b) => a + Number(b.amount), 0);
-                                        sendWA(activeStudent.phone, `Total Tagihan: ${formatCurrency(total)}. Mohon Lunasi.`);
+                                        const billsList = unpaidBills.map(b => `• ${b.category_name} (${getMonthName(b.month)}): ${formatCurrency(b.amount)}`).join('\n');
+                                        const message = `Assalamu'alaikum Wr. Wb.
+
+Yth. Wali Santri ${activeStudent.name}
+
+Kami sampaikan pengingat pembayaran:
+
+TAGIHAN PEMBAYARAN
+* Nama Santri: ${activeStudent.name}
+* NIS: ${activeStudent.nis || '-'}
+
+RINCIAN TAGIHAN:
+${billsList}
+
+TOTAL: ${formatCurrency(total)}
+Status: BELUM LUNAS
+
+Mohon segera melakukan pembayaran. Jazakumullah khairan.
+
+Pondok Pesantren Tahfizh Qur'an Al-Usymuni`;
+                                        sendWA(activeStudent.phone, message);
                                     }} className="btn-primary w-full mt-6"><MessageCircle size={18} /> Kirim Tagihan WA</button>
                                 </div>
                             ) : (
@@ -695,9 +826,12 @@ export default function Santri() {
                                                     <div className="text-xs text-slate-500 font-mono">{formatCurrency(b.amount)}</div>
                                                 </div>
                                             </div>
-                                            {canEdit && (
-                                                <button onClick={() => handlePayBill(b)} disabled={saving} className="px-6 py-2 bg-slate-900 text-white rounded-lg text-sm font-bold hover:bg-emerald-600 disabled:opacity-50">Bayar</button>
-                                            )}
+                                            <div className="flex gap-2 items-center">
+                                                <button onClick={() => sendWAReminder(activeStudent, b)} className="p-2 bg-white border border-amber-200 rounded-lg text-amber-600 hover:bg-amber-50" title="Kirim Pengingat WA"><MessageCircle size={16} /></button>
+                                                {canEdit && (
+                                                    <button onClick={() => handlePayBill(b)} disabled={saving} className="px-6 py-2 bg-slate-900 text-white rounded-lg text-sm font-bold hover:bg-emerald-600 disabled:opacity-50">Bayar</button>
+                                                )}
+                                            </div>
                                         </div>
                                     )) : <div className="text-center py-8 text-slate-400 italic bg-slate-50 rounded-xl">Tidak ada tunggakan</div>}
                                 </div>
@@ -712,7 +846,7 @@ export default function Santri() {
                                                 <div className="font-bold text-slate-700 text-sm">{b.category_name}</div>
                                             </div>
                                             <div className="flex gap-2">
-                                                <button onClick={() => sendWA(activeStudent?.phone, `Lunas: ${b.category_name}`)} className="p-2 bg-white border border-green-200 rounded-lg text-green-600 hover:bg-green-50"><MessageCircle size={14} /></button>
+                                                <button onClick={() => sendWAReceipt(activeStudent, b)} className="p-2 bg-white border border-green-200 rounded-lg text-green-600 hover:bg-green-50" title="Kirim Bukti via WA"><MessageCircle size={14} /></button>
                                                 <button onClick={() => generateReceiptPDF({ id: b.id, date: new Date().toISOString(), student_name: activeStudent?.name, category: b.category_name, amount: b.amount })} className="p-2 bg-white border border-blue-200 rounded-lg text-blue-600 hover:bg-blue-50"><Printer size={14} /></button>
                                             </div>
                                         </div>

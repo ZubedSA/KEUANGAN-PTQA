@@ -14,10 +14,16 @@ import {
     Shield,
     Key,
     Loader2,
-    Banknote
+    Banknote,
+    AlertTriangle,
+    CheckCircle,
+    XCircle,
+    TrendingDown,
+    Clock
 } from 'lucide-react';
 import Logo from '../assets/logo.png';
 import { useAuth } from '../contexts/AuthContext';
+import { useNotifications } from '../contexts/NotificationContext';
 
 const Sidebar = ({ isOpen, toggleSidebar }) => {
     const location = useLocation();
@@ -208,11 +214,24 @@ const SubNavItem = ({ to, label }) => (
 export default function MainLayout() {
     const [isSidebarOpen, setIsSidebarOpen] = useState(false);
     const [showProfileMenu, setShowProfileMenu] = useState(false);
+    const [showNotifMenu, setShowNotifMenu] = useState(false);
     const [showPasswordModal, setShowPasswordModal] = useState(false);
     const [passwordForm, setPasswordForm] = useState({ current: '', new: '', confirm: '' });
     const [saving, setSaving] = useState(false);
     const { user, logout } = useAuth();
+    const { notifications, unreadCount, markAsRead } = useNotifications();
     const navigate = useNavigate();
+
+    const getNotifIcon = (type) => {
+        switch (type) {
+            case 'expense': return <TrendingDown className="text-red-500" size={16} />;
+            case 'overdue': return <AlertTriangle className="text-amber-500" size={16} />;
+            case 'approval': return <Clock className="text-blue-500" size={16} />;
+            case 'success': return <CheckCircle className="text-emerald-500" size={16} />;
+            case 'rejected': return <XCircle className="text-red-500" size={16} />;
+            default: return <Bell className="text-slate-500" size={16} />;
+        }
+    };
 
     const handleLogout = async () => {
         await logout();
@@ -290,10 +309,81 @@ export default function MainLayout() {
                     </div>
 
                     <div className="flex items-center gap-3 sm:gap-6">
-                        <button className="p-2.5 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-xl transition-all relative">
-                            <Bell size={20} />
-                            <span className="absolute top-2.5 right-2.5 w-2 h-2 bg-red-500 rounded-full border border-white"></span>
-                        </button>
+                        {/* Notification Bell with Dropdown */}
+                        <div className="relative">
+                            <button
+                                onClick={() => { setShowNotifMenu(!showNotifMenu); setShowProfileMenu(false); }}
+                                className="p-2.5 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-xl transition-all relative"
+                            >
+                                <Bell size={20} />
+                                {unreadCount > 0 && (
+                                    <span className="absolute top-1 right-1 min-w-[18px] h-[18px] bg-red-500 rounded-full border-2 border-white flex items-center justify-center text-[10px] font-bold text-white">
+                                        {unreadCount > 9 ? '9+' : unreadCount}
+                                    </span>
+                                )}
+                            </button>
+
+                            {/* Notification Dropdown */}
+                            {showNotifMenu && (
+                                <>
+                                    <div className="fixed inset-0 z-40" onClick={() => setShowNotifMenu(false)}></div>
+                                    <div className="absolute right-0 mt-2 w-80 sm:w-96 bg-white rounded-2xl shadow-2xl border border-slate-100 z-50 overflow-hidden">
+                                        <div className="p-4 border-b border-slate-100 bg-slate-50 flex items-center justify-between">
+                                            <h4 className="font-bold text-slate-800 flex items-center gap-2">
+                                                <Bell size={18} className="text-emerald-500" /> Notifikasi
+                                            </h4>
+                                            {unreadCount > 0 && (
+                                                <span className="text-xs bg-red-100 text-red-600 px-2 py-0.5 rounded-full font-bold">
+                                                    {unreadCount} baru
+                                                </span>
+                                            )}
+                                        </div>
+                                        <div className="max-h-80 overflow-y-auto">
+                                            {notifications.slice(0, 5).length > 0 ? (
+                                                notifications.slice(0, 5).map(notif => (
+                                                    <div
+                                                        key={notif.id}
+                                                        onClick={() => {
+                                                            markAsRead(notif.id);
+                                                            setShowNotifMenu(false);
+                                                            if (notif.link) navigate(notif.link);
+                                                        }}
+                                                        className={`p-3 border-b border-slate-50 hover:bg-slate-50 cursor-pointer transition-colors ${!notif.read ? 'bg-emerald-50/50' : ''
+                                                            }`}
+                                                    >
+                                                        <div className="flex items-start gap-3">
+                                                            <div className="p-2 rounded-lg bg-slate-100">
+                                                                {getNotifIcon(notif.type)}
+                                                            </div>
+                                                            <div className="flex-1 min-w-0">
+                                                                <p className="font-medium text-sm text-slate-800 truncate">{notif.title}</p>
+                                                                <p className="text-xs text-slate-500 truncate">{notif.message}</p>
+                                                            </div>
+                                                            {!notif.read && (
+                                                                <span className="w-2 h-2 bg-emerald-500 rounded-full mt-2"></span>
+                                                            )}
+                                                        </div>
+                                                    </div>
+                                                ))
+                                            ) : (
+                                                <div className="p-8 text-center text-slate-400">
+                                                    <Bell size={32} className="mx-auto mb-2 opacity-50" />
+                                                    <p className="text-sm">Tidak ada notifikasi</p>
+                                                </div>
+                                            )}
+                                        </div>
+                                        <div className="p-3 border-t border-slate-100 bg-slate-50">
+                                            <button
+                                                onClick={() => { setShowNotifMenu(false); navigate('/notifikasi'); }}
+                                                className="w-full py-2 text-sm font-medium text-emerald-600 hover:bg-emerald-50 rounded-lg transition-colors"
+                                            >
+                                                Lihat Semua Notifikasi →
+                                            </button>
+                                        </div>
+                                    </div>
+                                </>
+                            )}
+                        </div>
 
                         <div className="h-8 w-[1px] bg-slate-200 hidden sm:block"></div>
 
