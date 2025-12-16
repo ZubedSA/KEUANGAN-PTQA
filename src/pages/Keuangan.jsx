@@ -39,6 +39,8 @@ export default function Keuangan() {
         } else {
             setTypeFilter('all');
         }
+        // Reset category filter when tab changes
+        setCategoryFilter('');
     }, [tab]);
 
     // Filtered data
@@ -52,6 +54,30 @@ export default function Keuangan() {
             return true;
         }).sort((a, b) => new Date(b.date) - new Date(a.date));
     }, [transactions, typeFilter, search, dateFilter, categoryFilter]);
+
+    // Get unique categories from transactions based on type filter
+    const filteredCategories = useMemo(() => {
+        // Get all unique categories with their types from transactions
+        const categoryMap = {};
+        transactions.forEach(t => {
+            if (t.category && t.type) {
+                if (!categoryMap[t.category]) {
+                    categoryMap[t.category] = new Set();
+                }
+                categoryMap[t.category].add(t.type);
+            }
+        });
+
+        // Filter categories based on current type filter
+        if (typeFilter === 'all') {
+            return [...new Set(transactions.map(t => t.category).filter(Boolean))];
+        }
+
+        // Return only categories that have been used with the current type
+        return Object.entries(categoryMap)
+            .filter(([, types]) => types.has(typeFilter))
+            .map(([name]) => name);
+    }, [transactions, typeFilter]);
 
     const totalIncome = useMemo(() => filteredTransactions.filter(t => t.type === 'pemasukan').reduce((sum, t) => sum + Number(t.amount), 0), [filteredTransactions]);
     const totalExpense = useMemo(() => filteredTransactions.filter(t => t.type === 'pengeluaran').reduce((sum, t) => sum + Number(t.amount), 0), [filteredTransactions]);
@@ -308,7 +334,7 @@ export default function Keuangan() {
                         </div>
                         <select className="input-field w-auto py-2 text-sm max-w-[150px]" value={categoryFilter} onChange={e => setCategoryFilter(e.target.value)}>
                             <option value="">Semua Kategori</option>
-                            {categories.map(c => <option key={c.id} value={c.name}>{c.name}</option>)}
+                            {filteredCategories.map(name => <option key={name} value={name}>{name}</option>)}
                         </select>
                         <div className="flex items-center gap-2 bg-slate-100 p-1 rounded-xl">
                             <input type="date" className="bg-transparent border-none text-xs w-28 outline-none text-slate-600 font-medium" value={dateFilter.start} onChange={e => setDateFilter({ ...dateFilter, start: e.target.value })} />

@@ -50,6 +50,7 @@ export default function Santri() {
         start: new Date().toISOString().slice(0, 8) + '01',
         end: new Date().toISOString().slice(0, 10)
     });
+    const [reportStudentFilter, setReportStudentFilter] = useState('');
 
     // Helpers
     const generateId = () => Date.now().toString(36) + Math.random().toString(36).substr(2);
@@ -154,12 +155,27 @@ Pondok Tahfizh Qur'an Al-Usymuni`;
     const unpaidBills = useMemo(() => activeStudent ? bills.filter(b => b.student_id === activeStudent.id && b.status === 'Belum Lunas') : [], [bills, activeStudent]);
     const paidBills = useMemo(() => activeStudent ? bills.filter(b => b.student_id === activeStudent.id && b.status === 'Lunas') : [], [bills, activeStudent]);
 
+    // Report data - use paid bills (Lunas) from all students
     const reportData = useMemo(() => {
-        return transactions.filter(t => {
-            if (!t.student_id) return false;
-            return t.date >= reportFilter.start && t.date <= reportFilter.end;
-        }).sort((a, b) => (b.date || '').localeCompare(a.date || ''));
-    }, [transactions, reportFilter]);
+        return bills.filter(b => {
+            if (b.status !== 'Lunas') return false;
+            // Filter by student
+            if (reportStudentFilter && b.student_id !== reportStudentFilter) return false;
+            // Filter by updated_at date (payment date set by Supabase)
+            const paymentDate = b.updated_at ? b.updated_at.split('T')[0] : b.month + '-01';
+            if (reportFilter.start && paymentDate < reportFilter.start) return false;
+            if (reportFilter.end && paymentDate > reportFilter.end) return false;
+            return true;
+        }).map(b => ({
+            id: b.id,
+            date: b.updated_at ? b.updated_at.split('T')[0] : b.month + '-01', // Use updated_at, fallback to month
+            period: b.month,
+            student_name: b.student_name,
+            student_id: b.student_id,
+            category: b.category_name,
+            amount: b.amount
+        })).sort((a, b) => (b.date || '').localeCompare(a.date || ''));
+    }, [bills, reportFilter, reportStudentFilter]);
 
     // PDF Functions
     const generateReceiptPDF = async (tx) => {
@@ -297,29 +313,34 @@ Pondok Tahfizh Qur'an Al-Usymuni`;
 
     const exportReportPDF = async () => {
         try {
-            // Fetch fresh data from Supabase - transactions with student payments
+            // Fetch paid bills from Supabase - bills with status 'Lunas'
             let query = supabase
-                .from('transactions')
+                .from('student_bills')
                 .select('*')
-                .not('student_id', 'is', null)
-                .order('date', { ascending: false });
+                .eq('status', 'Lunas')
+                .order('updated_at', { ascending: false });
 
-            // Apply date filters
+            // Apply student filter
+            if (reportStudentFilter) {
+                query = query.eq('student_id', reportStudentFilter);
+            }
+
+            // Apply date filters (using updated_at field)
             if (reportFilter.start) {
-                query = query.gte('date', reportFilter.start);
+                query = query.gte('updated_at', reportFilter.start);
             }
             if (reportFilter.end) {
-                query = query.lte('date', reportFilter.end);
+                query = query.lte('updated_at', reportFilter.end + 'T23:59:59');
             }
 
-            const { data: txData, error } = await query;
+            const { data: billsData, error } = await query;
 
             if (error) {
                 alert('Gagal mengambil data: ' + error.message);
                 return;
             }
 
-            if (!txData || txData.length === 0) {
+            if (!billsData || billsData.length === 0) {
                 alert('Tidak ada data pembayaran dalam periode ini');
                 return;
             }
@@ -332,23 +353,31 @@ Pondok Tahfizh Qur'an Al-Usymuni`;
             doc.text("PTQA BATUAN - Laporan Pembayaran Santri", 35, 20);
             doc.setFontSize(10);
             doc.setFont("helvetica", "normal");
-            doc.text(`Periode: ${formatDate(reportFilter.start)} s/d ${formatDate(reportFilter.end)}`, 35, 26);
-            doc.text(`Tanggal Cetak: ${new Date().toLocaleDateString('id-ID')}`, 35, 31);
+            const studentName = reportStudentFilter ? students.find(s => s.id === reportStudentFilter)?.name : 'Semua Santri';
+            doc.text(`Santri: ${studentName}`, 35, 26);
+            doc.text(`Periode: ${formatDate(reportFilter.start)} s/d ${formatDate(reportFilter.end)}`, 35, 31);
+            doc.text(`Tanggal Cetak: ${new Date().toLocaleDateString('id-ID')}`, 35, 36);
 
             autoTable(doc, {
-                startY: 40,
-                head: [['Tanggal', 'Santri', 'Kategori', 'Jumlah']],
-                body: txData.map(t => [formatDate(t.date), t.student_name || '-', t.category || '-', formatCurrency(Number(t.amount))]),
+                startY: 45,
+                head: [['Tgl Bayar', 'Periode', 'Santri', 'Kategori', 'Jumlah']],
+                body: billsData.map(b => [
+                    formatDate(b.updated_at ? b.updated_at.split('T')[0] : b.month + '-01'),
+                    getMonthName(b.month, true),
+                    b.student_name || '-',
+                    b.category_name || '-',
+                    formatCurrency(Number(b.amount))
+                ]),
                 headStyles: { fillColor: [16, 185, 129] },
                 styles: { fontSize: 9 }
             });
 
-            const total = txData.reduce((s, t) => s + Number(t.amount), 0);
+            const total = billsData.reduce((s, b) => s + Number(b.amount), 0);
             const finalY = (doc).lastAutoTable.finalY + 10;
             doc.setFontSize(11);
             doc.setFont("helvetica", "bold");
             doc.text(`Total Pembayaran: ${formatCurrency(total)}`, 14, finalY);
-            doc.text(`Jumlah Transaksi: ${txData.length}`, 14, finalY + 6);
+            doc.text(`Jumlah Tagihan Lunas: ${billsData.length}`, 14, finalY + 6);
 
             doc.save(`Laporan_Pembayaran_${new Date().toISOString().split('T')[0]}.pdf`);
         } catch (err) {
@@ -430,26 +459,26 @@ Pondok Tahfizh Qur'an Al-Usymuni`;
     const handlePayBill = async (bill) => {
         setSaving(true);
         try {
-            const tx = {
+            // Only update bill status - don't add to transactions (pemasukan)
+            // Pembayaran santri is separate from general income
+            // Note: updated_at will be set automatically by Supabase
+            await updateBill(bill.id, { status: 'Lunas' });
+            await logActivity('PEMBAYARAN', `${activeStudent.name} - ${bill.category_name}`);
+
+            // Set payment data for receipt
+            const paymentData = {
                 id: generateId(),
                 date: new Date().toISOString().split('T')[0],
-                type: 'pemasukan',
                 category: bill.category_name,
                 amount: Number(bill.amount),
-                description: `Bayar ${bill.category_name}`,
                 student_id: activeStudent.id,
-                student_name: activeStudent.name
-            };
-            await updateBill(bill.id, { status: 'Lunas' });
-            await insertTransaction(tx);
-            await logActivity('PEMBAYARAN', `${activeStudent.name} - ${bill.category_name}`);
-            setLastPayment({
-                ...tx,
+                student_name: activeStudent.name,
                 student_phone: activeStudent.phone,
                 student_nis: activeStudent.nis,
                 period: bill.month,
                 month: bill.month
-            });
+            };
+            setLastPayment(paymentData);
             setModalType('receipt');
             setIsModalOpen(true);
         } catch (err) { alert('Error: ' + err.message); }
@@ -629,14 +658,6 @@ Pondok Pesantren Tahfizh Qur'an Al-Usymuni`;
                             {activeTab === 'data' && <input className="input-field pl-10" placeholder="Cari Nama / NIS..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} />}
                             {activeTab === 'tagihan' && <input type="month" className="input-field pl-10" value={billFilter.start} onChange={e => setBillFilter({ ...billFilter, start: e.target.value })} />}
                             {activeTab === 'kategori' && <input className="input-field pl-10" placeholder="Cari Kategori..." value={categorySearch} onChange={e => setCategorySearch(e.target.value)} />}
-                            {activeTab === 'laporan' && (
-                                <div className="flex items-center gap-2 bg-slate-50 p-1 rounded-xl border">
-                                    <Calendar size={18} className="text-slate-400 ml-2" />
-                                    <input type="date" className="bg-transparent border-none text-sm outline-none w-32" value={reportFilter.start} onChange={e => setReportFilter({ ...reportFilter, start: e.target.value })} />
-                                    <span className="text-slate-300">|</span>
-                                    <input type="date" className="bg-transparent border-none text-sm outline-none w-32" value={reportFilter.end} onChange={e => setReportFilter({ ...reportFilter, end: e.target.value })} />
-                                </div>
-                            )}
                         </div>
                         {activeTab === 'kategori' && (
                             <select className="input-field w-auto min-w-[150px]" value={categoryTypeFilter} onChange={e => setCategoryTypeFilter(e.target.value)}>
@@ -857,17 +878,54 @@ Pondok Pesantren Tahfizh Qur'an Al-Usymuni`;
                     </div>
                 )}
 
-                {activeTab === 'laporan' && renderTable(
-                    ['Tanggal', 'Santri', 'Kategori', 'Jumlah'],
-                    reportData,
-                    t => (
-                        <tr key={t.id} className="hover:bg-slate-50">
-                            <td className="table-cell font-mono text-slate-600">{formatDate(t.date)}</td>
-                            <td className="table-cell font-bold text-slate-800">{t.student_name}</td>
-                            <td className="table-cell"><span className="badge badge-info">{t.category}</span></td>
-                            <td className="table-cell font-mono font-bold text-emerald-600 text-right">{formatCurrency(t.amount)}</td>
-                        </tr>
-                    )
+                {activeTab === 'laporan' && (
+                    <div className="space-y-6">
+                        {/* Filters */}
+                        <div className="card-premium flex flex-wrap gap-4 items-center justify-between">
+                            <div className="flex flex-wrap gap-3 items-center">
+                                <select
+                                    className="input-field w-auto py-2 text-sm"
+                                    value={reportStudentFilter}
+                                    onChange={e => setReportStudentFilter(e.target.value)}
+                                >
+                                    <option value="">Semua Santri</option>
+                                    {students.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+                                </select>
+                                <div className="flex items-center gap-2 bg-slate-100 p-1 rounded-xl">
+                                    <input
+                                        type="date"
+                                        className="bg-transparent border-none text-xs w-28 outline-none text-slate-600 font-medium"
+                                        value={reportFilter.start}
+                                        onChange={e => setReportFilter({ ...reportFilter, start: e.target.value })}
+                                    />
+                                    <span className="text-slate-400">-</span>
+                                    <input
+                                        type="date"
+                                        className="bg-transparent border-none text-xs w-28 outline-none text-slate-600 font-medium"
+                                        value={reportFilter.end}
+                                        onChange={e => setReportFilter({ ...reportFilter, end: e.target.value })}
+                                    />
+                                </div>
+                            </div>
+                            <div className="text-sm text-slate-600 font-medium">
+                                Total: <span className="text-emerald-600 font-bold">{formatCurrency(reportData.reduce((s, t) => s + Number(t.amount), 0))}</span>
+                                <span className="ml-4 text-slate-400">({reportData.length} pembayaran)</span>
+                            </div>
+                        </div>
+                        {renderTable(
+                            ['Tgl Bayar', 'Periode', 'Santri', 'Kategori', 'Jumlah'],
+                            reportData,
+                            t => (
+                                <tr key={t.id} className="hover:bg-slate-50">
+                                    <td className="table-cell font-mono text-slate-600">{formatDate(t.date)}</td>
+                                    <td className="table-cell text-slate-500">{getMonthName(t.period, true)}</td>
+                                    <td className="table-cell font-bold text-slate-800">{t.student_name}</td>
+                                    <td className="table-cell"><span className="badge badge-info">{t.category}</span></td>
+                                    <td className="table-cell font-mono font-bold text-emerald-600 text-right">{formatCurrency(t.amount)}</td>
+                                </tr>
+                            )
+                        )}
+                    </div>
                 )}
             </div>
         </div>
