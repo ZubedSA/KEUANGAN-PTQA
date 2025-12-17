@@ -161,14 +161,14 @@ Pondok Tahfizh Qur'an Al-Usymuni`;
             if (b.status !== 'Lunas') return false;
             // Filter by student
             if (reportStudentFilter && b.student_id !== reportStudentFilter) return false;
-            // Filter by updated_at date (payment date set by Supabase)
-            const paymentDate = b.updated_at ? b.updated_at.split('T')[0] : b.month + '-01';
+            // Filter by paid_at date (real payment date)
+            const paymentDate = b.paid_at || (b.updated_at ? b.updated_at.split('T')[0] : b.month + '-01');
             if (reportFilter.start && paymentDate < reportFilter.start) return false;
             if (reportFilter.end && paymentDate > reportFilter.end) return false;
             return true;
         }).map(b => ({
             id: b.id,
-            date: b.updated_at ? b.updated_at.split('T')[0] : b.month + '-01', // Use updated_at, fallback to month
+            date: b.paid_at || (b.updated_at ? b.updated_at.split('T')[0] : b.month + '-01'), // Priority: paid_at > updated_at > month
             period: b.month,
             student_name: b.student_name,
             student_id: b.student_id,
@@ -318,19 +318,19 @@ Pondok Tahfizh Qur'an Al-Usymuni`;
                 .from('student_bills')
                 .select('*')
                 .eq('status', 'Lunas')
-                .order('updated_at', { ascending: false });
+                .order('paid_at', { ascending: false });
 
             // Apply student filter
             if (reportStudentFilter) {
                 query = query.eq('student_id', reportStudentFilter);
             }
 
-            // Apply date filters (using updated_at field)
+            // Apply date filters (using paid_at field)
             if (reportFilter.start) {
-                query = query.gte('updated_at', reportFilter.start);
+                query = query.gte('paid_at', reportFilter.start);
             }
             if (reportFilter.end) {
-                query = query.lte('updated_at', reportFilter.end + 'T23:59:59');
+                query = query.lte('paid_at', reportFilter.end + 'T23:59:59');
             }
 
             const { data: billsData, error } = await query;
@@ -362,7 +362,7 @@ Pondok Tahfizh Qur'an Al-Usymuni`;
                 startY: 45,
                 head: [['Tgl Bayar', 'Periode', 'Santri', 'Kategori', 'Jumlah']],
                 body: billsData.map(b => [
-                    formatDate(b.updated_at ? b.updated_at.split('T')[0] : b.month + '-01'),
+                    formatDate(b.paid_at || (b.updated_at ? b.updated_at.split('T')[0] : b.month + '-01')),
                     getMonthName(b.month, true),
                     b.student_name || '-',
                     b.category_name || '-',
@@ -461,8 +461,9 @@ Pondok Tahfizh Qur'an Al-Usymuni`;
         try {
             // Only update bill status - don't add to transactions (pemasukan)
             // Pembayaran santri is separate from general income
-            // Note: updated_at will be set automatically by Supabase
-            await updateBill(bill.id, { status: 'Lunas' });
+            // Save paid_at for accurate payment date tracking
+            const paidDate = new Date().toISOString().split('T')[0];
+            await updateBill(bill.id, { status: 'Lunas', paid_at: paidDate });
             await logActivity('PEMBAYARAN', `${activeStudent.name} - ${bill.category_name}`);
 
             // Set payment data for receipt

@@ -75,12 +75,12 @@ export default function Tools() {
                     for (const row of data) {
                         await insertStudent({
                             id: generateId(),
-                            nis: row.NIS || row.Nis || '',
-                            name: row.Name || row.Nama || '',
-                            kelas: row.Class || row.Kelas || '',
-                            angkatan: row.Angkatan || row.Batch || '-',
-                            parent_name: row.Parent || row.Wali || '',
-                            phone: row.Phone || row.HP || '',
+                            nis: row.NIS || row.Nis || row.nis || '',
+                            name: row.Name || row.Nama || row.name || row['Nama Santri'] || '',
+                            kelas: row.Class || row.Kelas || row.kelas || '',
+                            angkatan: row.Angkatan || row.Batch || row.angkatan || '-',
+                            parent_name: row.Parent || row.Wali || row['Wali Santri'] || row['Nama Wali'] || row['Orang Tua'] || row.parent_name || row.wali || '',
+                            phone: row.Phone || row.HP || row.hp || row['No HP'] || row['No. HP'] || row.WhatsApp || row.WA || row.Telepon || row.telepon || row['No WA'] || row['No. WhatsApp'] || row.phone || '',
                             status: 'Aktif'
                         });
                     }
